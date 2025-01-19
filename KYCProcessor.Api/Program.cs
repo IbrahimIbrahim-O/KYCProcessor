@@ -7,6 +7,7 @@ using KYCProcessor.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,42 +43,45 @@ var summaries = new[]
 
 #region MINIMAL APIS
 
-app.MapGet("/weatherforecast", [Authorize(Policy = "AdminOnly")] () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateTime.Now.AddDays(index),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-
-
 app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
 {
+    var validationResults = new List<ValidationResult>();
+    var context = new ValidationContext(request);
+
+    bool isValid = Validator.TryValidateObject(request, context, validationResults, true);
+
+    if (!isValid)
+    {
+        return Results.BadRequest(validationResults); 
+    }
+
 
     if (request == null)
     {
-        return Results.BadRequest("Request cannot be null");
+        return Results.BadRequest(new
+        {
+            message = "Request cannot be null"
+        });
     }
 
     var existingUser = await dbContext.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
 
     if (existingUser != null)
     {
-        return Results.BadRequest("User with this email already exists.");
+        return Results.BadRequest(new
+        {
+            message = "User with this email already exists."
+        });
     }
 
     var existingPhoneNumber = await dbContext.Users.SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber);
 
     if (existingPhoneNumber != null)
     {
-        return Results.BadRequest("User with this phone number already exists.");
+        return Results.BadRequest(new
+        {
+            message = "User with this phone number already exists."
+        });
     }
 
     var (hashedPassword, salt) = PasswordHash.HashPassword(request.Password);
@@ -106,24 +110,42 @@ app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
 
 app.MapPost("/signupAdmin", async (SignUpRequest request, AppDbContext dbContext) =>
 {
+    var validationResults = new List<ValidationResult>();
+    var context = new ValidationContext(request);
+
+    bool isValid = Validator.TryValidateObject(request, context, validationResults, true);
+
+    if (!isValid)
+    {
+        return Results.BadRequest(validationResults);
+    }
 
     if (request == null)
     {
-        return Results.BadRequest("Request cannot be null");
+        return Results.BadRequest(new
+        {
+            message = "Request cannot be null"
+        });
     }
 
     var existingUser = await dbContext.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
 
     if (existingUser != null)
     {
-        return Results.BadRequest("User with this email already exists.");
+        return Results.BadRequest(new
+        {
+            message = "User with this email already exists."
+        });
     }
 
     var existingPhoneNumber = await dbContext.Users.SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber);
 
     if (existingPhoneNumber != null)
     {
-        return Results.BadRequest("User with this phone number already exists.");
+        return Results.BadRequest(new
+        {
+            message = "User with this phone number already exists."
+        });
     }
 
     var (hashedPassword, salt) = PasswordHash.HashPassword(request.Password);
@@ -153,28 +175,50 @@ app.MapPost("/signupAdmin", async (SignUpRequest request, AppDbContext dbContext
 
 app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =>
 {
+    var validationResults = new List<ValidationResult>();
+    var context = new ValidationContext(request);
+
+    bool isValid = Validator.TryValidateObject(request, context, validationResults, true);
+
+    if (!isValid)
+    {
+        return Results.BadRequest(validationResults);
+    }
+
     if (request == null)
     {
-        return Results.BadRequest("Request cannot be null");
+        return Results.BadRequest(new
+        {
+            message = "Request cannot be null"
+        });
     }
 
     if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
     {
-        return Results.BadRequest("Email and password are required.");
+        return Results.BadRequest(new
+        {
+            message = "Email and password are required."
+        });
     }
 
     var user = await dbContext.Users.SingleOrDefaultAsync(u => u.Email == request.Email);
 
     if (user == null)
     {
-        return Results.BadRequest("Invalid credentials.");
+        return Results.BadRequest(new
+        {
+            message = "Invalid credentials."
+        });
     }
 
     var hashedPassword = PasswordHash.HashPasswordWithSalt(request.Password, user.PasswordSalt);
 
     if (hashedPassword != user.HashedPassword)
     {
-        return Results.BadRequest("Invalid credentials.");
+        return Results.BadRequest(new
+        {
+            message = "Invalid credentials."
+        });
     }
 
     user.LastLoginAt = DateTime.UtcNow;
@@ -197,23 +241,42 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
 
 app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, AppDbContext dbContext) =>
 {
+    var validationResults = new List<ValidationResult>();
+    var context = new ValidationContext(request);
+
+    bool isValid = Validator.TryValidateObject(request, context, validationResults, true);
+
+    if (!isValid)
+    {
+        return Results.BadRequest(validationResults);
+    }
+
     if (request == null)
     {
-        return Results.BadRequest("Request cannot be null");
+        return Results.BadRequest(new
+        {
+            message = "Request cannot be null"
+        });
     }
 
     var kycRequestPending = await dbContext.KycForms.SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber && u.KycStatus == KycStatus.Pending);
 
     if (kycRequestPending != null)
     {
-        return Results.BadRequest("You currently have a pending KYC request, Our people are currently reviewing your information and you will get a response shortly.");
+        return Results.BadRequest(new
+        {
+            message = "You currently have a pending KYC request, Our people are currently reviewing your information and you will get a response shortly."
+        });
     }
 
     var kycRequestConfirmed = await dbContext.KycForms.SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber && u.KycStatus == KycStatus.Confirmed);
 
     if (kycRequestConfirmed != null)
     {
-        return Results.BadRequest("Your Kyc form has been confirmed.");
+        return Results.BadRequest(new
+        {
+            message = "Your Kyc form has been confirmed."
+        });
     }
 
     var kycForm = new KycForm
@@ -227,22 +290,91 @@ app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, 
     dbContext.KycForms.Add(kycForm);
     await dbContext.SaveChangesAsync();
 
-    return Results.Ok("Kyc form submitted sucessfully, our team will review it and respond within 24 hours");
+    return Results.Ok(new
+    {
+        message = "Kyc form submitted sucessfully, our team will review it and respond within 24 hours"
+    });
 });
+
+app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmKycFormRequest request, AppDbContext dbContext) =>
+{
+    var validationResults = new List<ValidationResult>();
+    var context = new ValidationContext(request);
+
+    bool isValid = Validator.TryValidateObject(request, context, validationResults, true);
+
+    if (!isValid)
+    {
+        return Results.BadRequest(validationResults);
+    }
+
+    if (request == null)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Request cannot be null"
+        });
+    }
+
+    var kycRequestApproved= await dbContext
+                .KycForms.SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber && u.KycStatus == KycStatus.Confirmed);
+
+    if (kycRequestApproved != null)
+    {
+        return Results.BadRequest(new
+        {
+            message = "This customer already has a confirmed KYC"
+        });
+    }
+
+    var kycRequestToConfiram = await dbContext.KycForms.ToListAsync();
+
+
+    var kycRequestToConfirm = await dbContext.KycForms
+                    .SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber && u.KycStatus == KycStatus.Pending);
+
+    if (kycRequestToConfirm == null)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Kyc form does not exist."
+        });
+    }
+
+    kycRequestToConfirm.KycStatus = KycStatus.Confirmed;
+
+    var userCredit = await dbContext.UserCredits
+       .SingleOrDefaultAsync(uc => uc.PhoneNumber == request.PhoneNumber && uc.CreditStatus == CreditStatus.Credited);
+
+    if (userCredit != null)
+    {
+        return Results.BadRequest(new { message = "This customer has already received the 200 Naira credit." });
+    }
+
+    var newCredit = new UserCredit
+    {
+        Id = Guid.NewGuid(),
+        PhoneNumber = request.PhoneNumber,
+        Amount = 200,
+        CreditStatus = CreditStatus.Credited,
+        CreatedAt = DateTime.UtcNow
+    };
+
+    await dbContext.UserCredits.AddAsync(newCredit);
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new
+    { 
+        message = "Kyc form confirmed and customer credited with 200 naira." 
+    });
+
+});
+
 
 #endregion
 
 
 app.Run();
-
-
-#region Services
-
-internal record WeatherForecast(DateTime Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
-
-#endregion
 
 public partial class Program { }

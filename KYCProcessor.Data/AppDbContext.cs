@@ -14,6 +14,16 @@ namespace KYCProcessor.Data
 
         // DbSet for User entity
         public DbSet<User> Users { get; set; }
+
         public DbSet<KycForm> KycForms { get; set; }
+
+        public DbSet<UserCredit> UserCredits { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<UserCredit>()
+                .Property(u => u.Amount)
+                .HasPrecision(18, 2); 
+        }
     }
 }

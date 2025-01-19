@@ -44,6 +44,34 @@ namespace KYCProcessor.Api.Helpers
                 CreatedAt = DateTime.Now
             };
         }
+
+        public TokenResponse GenerateAdminJwtToken()
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Role, "admin")
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Secret"]));
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _config["Jwt:Issuer"],
+                audience: _config["Jwt:Issuer"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(Convert.ToDouble(_config["Jwt:ExpDuration"])),
+                signingCredentials: creds);
+
+            var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+            return new TokenResponse
+            {
+                AccessToken = accessToken,
+                AccessTokenExp = token.ValidTo,
+                CreatedAt = DateTime.Now
+            };
+        }
     }
 
     public class TokenResponse

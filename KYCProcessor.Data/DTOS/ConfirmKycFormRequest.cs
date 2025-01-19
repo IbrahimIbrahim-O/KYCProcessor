@@ -7,13 +7,8 @@ using System.Threading.Tasks;
 
 namespace KYCProcessor.Data.DTOS
 {
-    public class SubmitKycFormRequest
+    public class ConfirmKycFormRequest
     {
-        [Required(ErrorMessage = "First name is required.")]
-        [StringLength(50, ErrorMessage = "First name cannot be longer than 50 characters.")]
-        public string? FirstName { get; set; }
-
-
         [Phone(ErrorMessage = "Invalid phone number format.")]
         public string? PhoneNumber { get; set; }
     }
