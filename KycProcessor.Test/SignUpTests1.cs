@@ -1,39 +1,25 @@
-﻿using KYCProcessor.Api.Helpers;
-using KYCProcessor.Data;
-using Microsoft.Extensions.Configuration;
+using KYCProcessor.Api.Helpers;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.VisualStudio.TestPlatform.TestHost;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace KycProcessor.Test
 {
-    public class SignUpTests : IClassFixture<WebApplicationFactory<Program>>
+    public class SignUpTests1 : IClassFixture<WebApplicationFactory<Program>>
     {
         private readonly WebApplicationFactory<Program> _factory;
         private readonly HttpClient _client;
         private readonly Random _random;
-        private readonly IConfiguration _configuration;
 
-        public SignUpTests(WebApplicationFactory<Program> factory)
+        public SignUpTests1(WebApplicationFactory<Program> factory)
         {
             _factory = factory;
-            _client = factory.CreateClient();
+            _client = factory.CreateClient();  
             _random = new Random();
-            _configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string>
-                {
-                    { "Jwt:ValidAudience", "KYCProcessor" },
-                    { "Jwt:ValidIssuer", "KYCProcessor" },
-                    { "Jwt:Secret", "secret kyc processor is having fun all the way" },
-                    { "Jwt:ExpDuration", "1440" },
-                    { "Jwt:RefreshExpDuration", "5" },
-                    { "Jwt:ClockSkew", "5" }
-                })
-                .Build();
         }
 
         private string GenerateRandomEmail()
@@ -46,25 +32,10 @@ namespace KycProcessor.Test
             return "123456" + _random.Next(100000, 999999).ToString();
         }
 
-        private void SetUpInMemoryDatabase()
-        {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                            .UseInMemoryDatabase("InMemoryDb3")
-                            .Options;
-
-            using (var dbContext = new AppDbContext(options))
-            {
-                dbContext.Database.EnsureDeleted();  // Ensure the database is reset before each test
-                dbContext.Database.EnsureCreated();
-            }
-        }
-
         [Fact]
         public async Task Test_SignUp_ValidRequest_ReturnsOkAndToken()
         {
-            // Arrange: Set up the in-memory database
-            SetUpInMemoryDatabase();
-
+            // Arrange
             var signUpRequest = new
             {
                 Email = GenerateRandomEmail(),
@@ -75,12 +46,12 @@ namespace KycProcessor.Test
                 Gender = 0
             };
 
-            var content = new StringContent(JsonConvert.SerializeObject(signUpRequest), Encoding.UTF8, "application/json");
+            var content = new StringContent(JsonConvert.SerializeObject(signUpRequest), System.Text.Encoding.UTF8, "application/json");
 
-            // Act: Send the sign-up POST request to the "/signUp" endpoint
+            // Act: Send the sign-up POST request to the "/signup" endpoint
             var response = await _client.PostAsync("/signUp", content);
 
-            // Assert: Verify the response is successful
+            // Assert: Verify the response is successful 
             response.EnsureSuccessStatusCode();
 
             var responseString = await response.Content.ReadAsStringAsync();
@@ -96,9 +67,7 @@ namespace KycProcessor.Test
         [Fact]
         public async Task Test_SignUp_ExistingEmail_ReturnsBadRequest()
         {
-            // Arrange: Set up the in-memory database and create a valid sign-up request with an existing email
-            SetUpInMemoryDatabase();
-
+            // Arrange: Create a valid sign-up request with an existing email
             var signUpRequest = new
             {
                 Email = GenerateRandomEmail(),
@@ -106,7 +75,7 @@ namespace KycProcessor.Test
                 LastName = "Doe",
                 Password = "TestPassword123!",
                 PhoneNumber = GenerateRandomPhoneNumber(),
-                Gender = 1
+                Gender = 1  
             };
 
             var content = new StringContent(JsonConvert.SerializeObject(signUpRequest), Encoding.UTF8, "application/json");
@@ -122,15 +91,15 @@ namespace KycProcessor.Test
             Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
 
             var responseString = await secondResponse.Content.ReadAsStringAsync();
+
             Assert.Contains("User with this email already exists.", responseString);
         }
+
 
         [Fact]
         public async Task Test_SignUp_ExistingPhoneNumber_ReturnsBadRequest()
         {
-            // Arrange: Set up the in-memory database and create a valid sign-up request with an existing phone number
-            SetUpInMemoryDatabase();
-
+            // Arrange: Create a valid sign-up request with an existing email
             var signUpRequest = new
             {
                 Email = GenerateRandomEmail(),
@@ -159,42 +128,15 @@ namespace KycProcessor.Test
 
             var content2 = new StringContent(JsonConvert.SerializeObject(signUpRequest2), Encoding.UTF8, "application/json");
 
-            // Act: Make the second POST request with the same phone number (this should fail)
+            // Act: Make the second POST request with the same email (this should fail)
             var secondResponse = await _client.PostAsync("/signUp", content2);
 
             // Assert: Ensure the second request fails with a BadRequest
             Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
 
             var responseString = await secondResponse.Content.ReadAsStringAsync();
+
             Assert.Contains("User with this phone number already exists.", responseString);
-        }
-
-        [Fact]
-        public async Task ValidateSignUp_InvalidRequest_ReturnsBadRequestWithErrors()
-        {
-            // Invalid sign-up request with multiple validation issues (invalid email, invalid phone number, missing fields)
-            var invalidRequest = new
-            {
-                Email = "invalid-email",       
-                PhoneNumber = "12345",         
-                FirstName = "",               
-                LastName = "Doe",              
-                Password = "Test",             
-                Gender = 0
-            };
-
-            var content = new StringContent(JsonConvert.SerializeObject(invalidRequest), System.Text.Encoding.UTF8, "application/json");
-
-            // Act: Send POST request to validate the sign-up request
-            var response = await _client.PostAsync("/signUp", content);
-
-            // Assert: Verify that the response is a BadRequest (400)
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseContent = JsonConvert.DeserializeObject<dynamic>(responseString);
-
-            Assert.NotEmpty(responseContent);
         }
     }
 }

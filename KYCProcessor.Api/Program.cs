@@ -371,6 +371,50 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
 });
 
+app.MapPost("/rejectKycForm", [Authorize(Policy = "AdminOnly")] async (RejectKycFormRequest request, AppDbContext dbContext) =>
+{
+    var validationResults = new List<ValidationResult>();
+    var context = new ValidationContext(request);
+
+    bool isValid = Validator.TryValidateObject(request, context, validationResults, true);
+
+    if (!isValid)
+    {
+        return Results.BadRequest(validationResults);
+    }
+
+    if (request == null)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Request cannot be null"
+        });
+    }
+
+    // Check if the KYC form with the given phone number exists and is pending
+    var kycRequestToReject = await dbContext.KycForms
+                    .SingleOrDefaultAsync(u => u.PhoneNumber == request.PhoneNumber && u.KycStatus == KycStatus.Pending);
+
+    if (kycRequestToReject == null)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Kyc form does not exist or is not in pending status."
+        });
+    }
+
+    // Mark the KYC form as rejected
+    kycRequestToReject.KycStatus = KycStatus.Rejected;
+
+    // Optional: If you want to notify the user about rejection (e.g., sending email or an alert), you can add logic here.
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        message = "Kyc form has been rejected."
+    });
+});
 
 #endregion
 
