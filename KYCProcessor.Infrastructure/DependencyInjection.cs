@@ -65,6 +65,8 @@ namespace KYCProcessor.Infrastructure
                 options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
             });
 
+            services.AddLogging();
+
             return services;
 
         }

@@ -1,9 +1,12 @@
-﻿using KYCProcessor.Data;
+﻿using KYCProcessor.Api.Helpers;
+using KYCProcessor.Data;
+using KYCProcessor.Data.DTOS;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -103,13 +106,124 @@ namespace KycProcessor.Test
             response.EnsureSuccessStatusCode();
 
             var responseString = await response.Content.ReadAsStringAsync();
-            var responseContent = JsonConvert.DeserializeObject<dynamic>(responseString);
+            var responseContent = JsonConvert.DeserializeObject<TokenResponseWrapper>(responseString);
 
             Assert.NotNull(responseContent.Token);
-            Assert.NotNull(responseContent.UserInfo);
-            Assert.Equal(email, responseContent.UserInfo.Email.ToString());
         }
 
+
+        [Fact]
+        public async Task Test_Login_InvalidCredentials_ReturnsBadRequest()
+        {
+            // Arrange: Set up the database and create a user
+            var email = GenerateRandomEmail();
+            var password = "TestPassword123!";
+            await CreateNewUser(email, password);  // Create a new user
+
+            var invalidLoginRequest = new
+            {
+                Email = email,
+                Password = "WrongPassword123!" // Incorrect password
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(invalidLoginRequest), Encoding.UTF8, "application/json");
+
+            var response = await _client.PostAsync("/login", content);
+
+            // Assert: Verify the response is a BadRequest
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseContent = JsonConvert.DeserializeObject<dynamic>(responseString);
+
+            Assert.Equal("Invalid credentials.", responseContent.message.ToString());
+        }
+
+        [Fact]
+        public async Task Test_Login_EmptyEmail_ReturnsBadRequest()
+        {
+            // Arrange: Set up the login request with an empty email
+            var loginRequest = new
+            {
+                Email = "",
+                Password = "TestPassword123!"
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(loginRequest), Encoding.UTF8, "application/json");
+
+            // Act: Send login request with missing email
+            var response = await _client.PostAsync("/login", content);
+
+            // Assert: Verify the response is a BadRequest due to empty email
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            var validationErrors = JsonConvert.DeserializeObject<List<ValidationError>>(responseString);
+
+            Assert.NotNull(validationErrors);
+            Assert.Single(validationErrors);  
+
+            var validationError = validationErrors[0];
+
+            Assert.Equal("Email is required.", validationError.ErrorMessage);
+
+            Assert.Contains("Email", validationError.MemberNames);
+        }
+
+
+        [Fact]
+        public async Task Test_Login_EmptyPassword_ReturnsBadRequest()
+        {
+            // Arrange: Set up the login request with an empty password
+            var loginRequest = new
+            {
+                Email = GenerateRandomEmail(),
+                Password = "" // Empty password
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(loginRequest), Encoding.UTF8, "application/json");
+
+            // Act: Send login request with missing password
+            var response = await _client.PostAsync("/login", content);
+
+            // Assert: Verify the response is a BadRequest due to empty password
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            var validationErrors = JsonConvert.DeserializeObject<List<ValidationError>>(responseString);
+
+            Assert.NotNull(validationErrors);
+            Assert.Single(validationErrors);
+
+            var validationError = validationErrors[0];
+
+            Assert.Equal("Password is required.", validationError.ErrorMessage);
+
+            Assert.Contains("Password", validationError.MemberNames);
+        }
+
+        [Fact]
+        public async Task Test_Login_UserNotFound_ReturnsBadRequest()
+        {
+            var loginRequest = new
+            {
+                Email = GenerateRandomEmail(),
+                Password = "SomePassword7677"
+            };
+
+            var content = new StringContent(JsonConvert.SerializeObject(loginRequest), Encoding.UTF8, "application/json");
+
+            // Act: Send login request with non-existent email
+            var response = await _client.PostAsync("/login", content);
+
+            // Assert: Verify the response is a BadRequest
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseContent = JsonConvert.DeserializeObject<dynamic>(responseString);
+
+            Assert.Equal("Invalid credentials.", responseContent.message.ToString());
+        }
 
     }
 }

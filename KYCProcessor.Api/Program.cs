@@ -7,6 +7,7 @@ using KYCProcessor.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,8 +44,10 @@ var summaries = new[]
 
 #region MINIMAL APIS
 
-app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
+app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext, ILogger<Program> logger) =>
 {
+    logger.LogInformation("Handling /signup request for email: {Email}", request.Email);
+
     var validationResults = new List<ValidationResult>();
     var context = new ValidationContext(request);
 
@@ -52,12 +55,14 @@ app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
 
     if (!isValid)
     {
+        logger.LogWarning("Validation failed for /signup request: {ValidationResults}", validationResults);
         return Results.BadRequest(validationResults); 
     }
 
 
     if (request == null)
     {
+        logger.LogError("Signup request cannot be null.");
         return Results.BadRequest(new
         {
             message = "Request cannot be null"
@@ -68,6 +73,7 @@ app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
 
     if (existingUser != null)
     {
+        logger.LogWarning("User with email {Email} already exists.", request.Email);
         return Results.BadRequest(new
         {
             message = "User with this email already exists."
@@ -78,6 +84,7 @@ app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
 
     if (existingPhoneNumber != null)
     {
+        logger.LogWarning("User with phone number {PhoneNumber} already exists.", request.PhoneNumber);
         return Results.BadRequest(new
         {
             message = "User with this phone number already exists."
@@ -101,6 +108,8 @@ app.MapPost("/signup", async (SignUpRequest request, AppDbContext dbContext) =>
 
     dbContext.Users.Add(user);
     await dbContext.SaveChangesAsync();
+
+    logger.LogInformation("New user with email {Email} created successfully.", request.Email);
 
     var jwtToken = new JwtToken(builder.Configuration);
     var token = jwtToken.GenerateJwtToken(user);
@@ -173,8 +182,10 @@ app.MapPost("/signupAdmin", async (SignUpRequest request, AppDbContext dbContext
     return Results.Ok(new { Token = token });
 });
 
-app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =>
+app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext, ILogger<Program> logger) =>
 {
+    logger.LogInformation("Handling /login request for email: {Email}", request.Email);
+
     var validationResults = new List<ValidationResult>();
     var context = new ValidationContext(request);
 
@@ -182,11 +193,13 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
 
     if (!isValid)
     {
+        logger.LogWarning("Validation failed for /login request: {ValidationResults}", validationResults);
         return Results.BadRequest(validationResults);
     }
 
     if (request == null)
     {
+        logger.LogError("Login request cannot be null.");
         return Results.BadRequest(new
         {
             message = "Request cannot be null"
@@ -195,6 +208,8 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
 
     if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
     {
+        logger.LogWarning("Email or password missing in /login request.");
+
         return Results.BadRequest(new
         {
             message = "Email and password are required."
@@ -205,6 +220,8 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
 
     if (user == null)
     {
+        logger.LogWarning("Invalid login attempt for email: {Email}", request.Email);
+
         return Results.BadRequest(new
         {
             message = "Invalid credentials."
@@ -215,6 +232,8 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
 
     if (hashedPassword != user.HashedPassword)
     {
+        logger.LogWarning("Invalid login attempt for email: {Email}", request.Email);
+
         return Results.BadRequest(new
         {
             message = "Invalid credentials."
@@ -223,6 +242,8 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
 
     user.LastLoginAt = DateTime.UtcNow;
     await dbContext.SaveChangesAsync();
+
+    logger.LogInformation("User with email {Email} logged in successfully.", request.Email);
 
     var jwtToken = new JwtToken(builder.Configuration);  
     var token = jwtToken.GenerateJwtToken(user);
@@ -239,8 +260,10 @@ app.MapPost("/login", async (LoginUserRequest request, AppDbContext dbContext) =
     return Results.Ok(new { Token = token, UserInfo = userInfo});
 });
 
-app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, AppDbContext dbContext) =>
+app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, AppDbContext dbContext, ILogger<Program> logger) =>
 {
+    logger.LogInformation("Received KYC form submission request for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+
     var validationResults = new List<ValidationResult>();
     var context = new ValidationContext(request);
 
@@ -248,11 +271,15 @@ app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, 
 
     if (!isValid)
     {
+        logger.LogWarning("Validation failed for KYC form submission for PhoneNumber: {PhoneNumber}. Errors: {ValidationErrors}", request.PhoneNumber, validationResults);
+
         return Results.BadRequest(validationResults);
     }
 
     if (request == null)
     {
+        logger.LogError("Received a null request for KYC form submission");
+
         return Results.BadRequest(new
         {
             message = "Request cannot be null"
@@ -263,6 +290,8 @@ app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, 
 
     if (kycRequestPending != null)
     {
+        logger.LogWarning("KYC form for PhoneNumber: {PhoneNumber} is already pending.", request.PhoneNumber);
+
         return Results.BadRequest(new
         {
             message = "You currently have a pending KYC request, Our people are currently reviewing your information and you will get a response shortly."
@@ -273,6 +302,8 @@ app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, 
 
     if (kycRequestConfirmed != null)
     {
+        logger.LogInformation("KYC form for PhoneNumber: {PhoneNumber} has already been confirmed.", request.PhoneNumber);
+
         return Results.BadRequest(new
         {
             message = "Your Kyc form has been confirmed."
@@ -290,14 +321,19 @@ app.MapPost("/submitKycForm",  [Authorize] async (SubmitKycFormRequest request, 
     dbContext.KycForms.Add(kycForm);
     await dbContext.SaveChangesAsync();
 
+    logger.LogInformation("Successfully submitted KYC form for PhoneNumber: {PhoneNumber}. ID: {KycFormId}", request.PhoneNumber, kycForm.Id);
+
+
     return Results.Ok(new
     {
         message = "Kyc form submitted sucessfully, our team will review it and respond within 24 hours"
     });
 });
 
-app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmKycFormRequest request, AppDbContext dbContext) =>
+app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmKycFormRequest request, AppDbContext dbContext, ILogger<Program> logger) =>
 {
+    logger.LogInformation("Received KYC confirmation request for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+
     var validationResults = new List<ValidationResult>();
     var context = new ValidationContext(request);
 
@@ -305,11 +341,15 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
     if (!isValid)
     {
+        logger.LogWarning("Validation failed for KYC confirmation for PhoneNumber: {PhoneNumber}. Errors: {ValidationErrors}", request.PhoneNumber, validationResults);
+
         return Results.BadRequest(validationResults);
     }
 
     if (request == null)
     {
+        logger.LogError("Received a null request for KYC confirmation");
+
         return Results.BadRequest(new
         {
             message = "Request cannot be null"
@@ -321,13 +361,16 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
     if (kycRequestApproved != null)
     {
+        logger.LogWarning("KYC form for PhoneNumber: {PhoneNumber} has already been confirmed.", request.PhoneNumber);
+
         return Results.BadRequest(new
         {
             message = "This customer already has a confirmed KYC"
         });
     }
 
-    var kycRequestToConfiram = await dbContext.KycForms.ToListAsync();
+
+    logger.LogInformation("Checking for pending KYC form for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
 
 
     var kycRequestToConfirm = await dbContext.KycForms
@@ -335,6 +378,8 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
     if (kycRequestToConfirm == null)
     {
+        logger.LogWarning("No pending KYC form found for PhoneNumber: {PhoneNumber}.", request.PhoneNumber);
+
         return Results.BadRequest(new
         {
             message = "Kyc form does not exist."
@@ -343,11 +388,15 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
     kycRequestToConfirm.KycStatus = KycStatus.Confirmed;
 
+    logger.LogInformation("KYC form for PhoneNumber: {PhoneNumber} has been confirmed.", request.PhoneNumber);
+
     var userCredit = await dbContext.UserCredits
        .SingleOrDefaultAsync(uc => uc.PhoneNumber == request.PhoneNumber && uc.CreditStatus == CreditStatus.Credited);
 
     if (userCredit != null)
     {
+        logger.LogWarning("Customer with PhoneNumber: {PhoneNumber} has already received the 200 Naira credit.", request.PhoneNumber);
+
         return Results.BadRequest(new { message = "This customer has already received the 200 Naira credit." });
     }
 
@@ -364,6 +413,8 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
     await dbContext.SaveChangesAsync();
 
+    logger.LogInformation("200 Naira credit successfully added for PhoneNumber: {PhoneNumber}. Credit ID: {CreditId}", request.PhoneNumber, newCredit.Id);
+
     return Results.Ok(new
     { 
         message = "Kyc form confirmed and customer credited with 200 naira." 
@@ -371,8 +422,10 @@ app.MapPost("/confirmKycForm", [Authorize(Policy = "AdminOnly")] async (ConfirmK
 
 });
 
-app.MapPost("/rejectKycForm", [Authorize(Policy = "AdminOnly")] async (RejectKycFormRequest request, AppDbContext dbContext) =>
+app.MapPost("/rejectKycForm", [Authorize(Policy = "AdminOnly")] async (RejectKycFormRequest request, AppDbContext dbContext, ILogger<Program> logger) =>
 {
+    logger.LogInformation("Received KYC rejection request for PhoneNumber: {PhoneNumber}", request.PhoneNumber);
+
     var validationResults = new List<ValidationResult>();
     var context = new ValidationContext(request);
 
@@ -380,16 +433,22 @@ app.MapPost("/rejectKycForm", [Authorize(Policy = "AdminOnly")] async (RejectKyc
 
     if (!isValid)
     {
+        logger.LogWarning("Validation failed for KYC rejection for PhoneNumber: {PhoneNumber}. Errors: {ValidationErrors}", request.PhoneNumber, validationResults);
+
         return Results.BadRequest(validationResults);
     }
 
     if (request == null)
     {
+        logger.LogError("Received a null request for KYC rejection");
+
         return Results.BadRequest(new
         {
             message = "Request cannot be null"
         });
     }
+
+    logger.LogInformation("Checking if the KYC form for PhoneNumber: {PhoneNumber} exists and is in pending status.", request.PhoneNumber);
 
     // Check if the KYC form with the given phone number exists and is pending
     var kycRequestToReject = await dbContext.KycForms
@@ -397,6 +456,8 @@ app.MapPost("/rejectKycForm", [Authorize(Policy = "AdminOnly")] async (RejectKyc
 
     if (kycRequestToReject == null)
     {
+        logger.LogWarning("No pending KYC form found for PhoneNumber: {PhoneNumber}.", request.PhoneNumber);
+
         return Results.BadRequest(new
         {
             message = "Kyc form does not exist or is not in pending status."
@@ -406,9 +467,11 @@ app.MapPost("/rejectKycForm", [Authorize(Policy = "AdminOnly")] async (RejectKyc
     // Mark the KYC form as rejected
     kycRequestToReject.KycStatus = KycStatus.Rejected;
 
-    // Optional: If you want to notify the user about rejection (e.g., sending email or an alert), you can add logic here.
+    logger.LogInformation("KYC form for PhoneNumber: {PhoneNumber} has been rejected.", request.PhoneNumber);
 
     await dbContext.SaveChangesAsync();
+
+    logger.LogInformation("KYC rejection for PhoneNumber: {PhoneNumber} processed successfully.", request.PhoneNumber);
 
     return Results.Ok(new
     {
