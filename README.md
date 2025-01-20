@@ -35,10 +35,9 @@ Before you begin, ensure you have met the following requirements:
 
 1. **Clone the Repository:**
    ```bash
-   git clone https://github.com/yourusername/kyc-project.git
+   git clone https://github.com/IbrahimIbrahim-O/KYCProcessor.git
    cd kyc-project
    ```
-
 2. **Configure Database:**
    - Open `appsettings.json` and ensure the connection string points to your SQL Server instance.
    - If you are using SQL Server, set up a database, and update the connection string accordingly.
