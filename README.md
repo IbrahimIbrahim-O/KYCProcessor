@@ -18,7 +18,7 @@ This project is a KYC (Know Your Customer) system used for KYC form submission, 
 ## Technologies Used
 
 - **ASP.NET Core**: Web API framework for building and running the application.
-- **Entity Framework Core**: ORM for data access, working with SQL Server.
+- **Dapper**: ORM for data access, working with SQL Server.
 - **SQL Server**: Database management system for storing user and KYC data.
 - **JWT**: JSON Web Tokens for user authentication.
 - **Logging**: Integrated logging for tracking operations and errors.
