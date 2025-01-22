@@ -1,7 +1,3 @@
-Here’s a sample README for your KYC (Know Your Customer) project in Git. You can customize it as needed for your specific implementation:
-
----
-
 # KYC (Know Your Customer) Application
 
 This project is a KYC (Know Your Customer) system used for KYC form submission, confirmation, rejection and user crediting, allowing administrators to process KYC requests. it supports verifying and managing user identities. 
