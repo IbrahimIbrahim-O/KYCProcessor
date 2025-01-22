@@ -67,6 +67,7 @@ namespace KYCProcessor.Infrastructure
 
             services.AddLogging();
 
+
             return services;
 
         }

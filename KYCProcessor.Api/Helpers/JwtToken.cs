@@ -1,4 +1,5 @@
 ﻿using KYCProcessor.Data.Models;
+using KYCProcessor.Data.Response;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,20 +18,20 @@ namespace KYCProcessor.Api.Helpers
         {
             var claims = new[]
             {
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim("firstname", user.FirstName),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email??string.Empty),
+                new Claim("firstname", user.FirstName??string.Empty),
                 new Claim("id", user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Role, user.Role )
             };
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Secret"]));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Secret"] ?? "secret kyc processoris having fun all the way"));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Issuer"],
+                issuer: _config["Jwt:Issuer"] ?? "KYCProcessor",
+                audience: _config["Jwt:Issuer"] ?? "KYCProcessor",
                 claims: claims,
                 expires: DateTime.UtcNow.AddMinutes(Convert.ToDouble(_config["Jwt:ExpDuration"])),
                 signingCredentials: creds);
@@ -102,14 +103,14 @@ namespace KYCProcessor.Api.Helpers
         }
     }
 
-    public class TokenResponse
-    {
-        public string? AccessToken { get; set; }
+    //public class TokenResponse
+    //{
+    //    public string? AccessToken { get; set; }
 
-        public DateTime CreatedAt { get; set; }
+    //    public DateTime CreatedAt { get; set; }
 
-        public DateTime AccessTokenExp { set; get; }
-    }
+    //    public DateTime AccessTokenExp { set; get; }
+    //}
 
     public class TokenResponseWrapper
     {
